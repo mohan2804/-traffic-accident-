@@ -1,0 +1,59 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+
+# Load and inspect dataset
+df = pd.read_csv("traffic_accidents.csv")
+print("Initial data:", df.shape)
+
+# Drop rows with missing critical values
+df.dropna(subset=['severity', 'time', 'weather', 'road_type', 'light_conditions'], inplace=True)
+
+# Convert time to datetime
+df['time'] = pd.to_datetime(df['time'], errors='coerce')
+df.dropna(subset=['time'], inplace=True)
+df['hour'] = df['time'].dt.hour
+df['day_of_week'] = df['time'].dt.dayofweek
+
+# Feature: Rush hour
+df['rush_hour'] = df['hour'].apply(lambda x: 1 if 7 <= x <= 9 or 16 <= x <= 18 else 0)
+
+# Encode categorical features
+df = pd.get_dummies(df, columns=['weather', 'road_type', 'light_conditions'], drop_first=True)
+
+# Drop original datetime and unused columns
+df.drop(columns=['time'], inplace=True)
+
+# Define target and features
+y = df['severity']
+X = df.drop(columns=['severity'])
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train Random Forest
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Predict and evaluate
+y_pred = model.predict(X_test)
+print("Model Evaluation:\n", classification_report(y_test, y_pred))
+
+# Example prediction
+sample = X.iloc[0:1]
+prediction = model.predict(sample)
+print("Sample Prediction (Severity):", prediction[0])
+
+# Visualize accident frequency by hour and day
+heatmap_data = df.groupby(['day_of_week', 'hour']).size().unstack()
+plt.figure(figsize=(10, 6))
+sns.heatmap(heatmap_data, cmap="YlOrRd")
+plt.title("Accident Frequency by Day and Hour")
+plt.xlabel("Hour")
+plt.ylabel("Day of Week")
+plt.tight_layout()
+plt.show()
